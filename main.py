@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
+from google import genai
+import os
 
 app = FastAPI(title="Gemini Travel Agent API")
 
-# Allow all origins for testing
+# Allow all origins (change in production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,8 +17,8 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
-# Initialize Gemini client
-client = genai.Client()
+# Initialize Gemini API
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 # 🔒 STRICT JSON PROMPT (ONLY for trip planning)
 TRAVEL_AGENT_PROMPT = """
@@ -27,6 +28,11 @@ Return ONLY valid JSON.
 No explanations.
 No markdown.
 No extra text.
+
+Response must:
+- Be valid JSON
+- Start with { and end with }
+- No trailing commas
 
 Schema:
 {
@@ -53,7 +59,7 @@ You are a helpful travel assistant.
 Answer clearly and concisely in plain text.
 """
 
-# 🧠 Simple intent detection
+# 🧠 Intent detection
 def is_trip_planning(message: str) -> bool:
     keywords = [
         "plan a trip",
@@ -69,43 +75,32 @@ def is_trip_planning(message: str) -> bool:
     msg = message.lower()
     return any(k in msg for k in keywords)
 
+# 🩺 Health check
 @app.get("/")
 def health():
     return {"status": "ok"}
 
+# 💬 Chat endpoint
 @app.post("/chat")
 def chat(data: ChatRequest):
     try:
         user_message = data.message
+        is_trip = is_trip_planning(user_message)
 
-        # 🔀 Decide prompt based on intent
-        if is_trip_planning(user_message):
-            full_prompt = f"""
-{TRAVEL_AGENT_PROMPT}
-
-User request:
-{user_message}
-"""
+        if is_trip:
+            full_prompt = f"{TRAVEL_AGENT_PROMPT}\nUser request:\n{user_message}"
         else:
-            full_prompt = f"""
-{NORMAL_CHAT_PROMPT}
+            full_prompt = f"{NORMAL_CHAT_PROMPT}\nUser request:\n{user_message}"
 
-User request:
-{user_message}
-"""
-
-
-
-
-
-        response = client.models.generate_content(
+        # Gemini 2.0 Flash call using new SDK
+        response = genai.chat.create(
             model="gemini-2.0-flash",
-            contents=full_prompt
+            messages=[{"author": "user", "content": full_prompt}]
         )
 
         return {
-            "reply": response.text,
-            "mode": "json" if is_trip_planning(user_message) else "text"
+            "reply": response.last.content[0].text,
+            "mode": "json" if is_trip else "text"
         }
 
     except Exception as e:
@@ -114,7 +109,17 @@ User request:
             "error": str(e)
         }
 
+# 📦 List available models
 @app.get("/models")
 def list_models():
-    models = client.models.list()
-    return [m.name for m in models]
+    try:
+        models = genai.models.list()
+        return [m.name for m in models]
+    except Exception as e:
+        return {"error": str(e)}
+
+# 🚀 Run locally / Railway
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
