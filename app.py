@@ -1,25 +1,29 @@
-from flask import Flask, request, jsonify
 import os
 from google import genai
 
-app = Flask(__name__)
+def generate_gemini_content():
+    # 1. Setup - Fetch API Key from environment variables
+    # Recommendation: Run `export GEMINI_API_KEY='your_key_here'` in your terminal
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    if not api_key:
+        raise ValueError("Please set the GEMINI_API_KEY environment variable.")
 
-# Set API key from Railway variables
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    # 2. Initialize the Client
+    client = genai.Client(api_key=api_key)
 
-# Gemini 2.5 chat model
-model = genai.ChatModel.from_name("chat-bison-002")
+    # 3. Generate Content
+    # We're using 'gemini-2.0-flash' (standard for 2026) for speed and efficiency
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="Explain the concept of 'Recursion' to a junior developer."
+    )
 
-@app.route("/api", methods=["POST"])
-def api():
-    data = request.get_json()
-    if not data or "message" not in data:
-        return jsonify({"error": "No message provided"}), 400
-
-    user_input = data["message"]
-    response = model.predict(messages=[{"author": "user", "content": user_input}])
-
-    return jsonify({"reply": response.content})
+    # 4. Output the result
+    print("-" * 30)
+    print("Gemini Response:")
+    print("-" * 30)
+    print(response.text)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    generate_gemini_content()
