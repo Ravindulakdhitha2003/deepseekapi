@@ -45,3 +45,21 @@ def chat(data: ChatRequest):
 @app.get("/models")
 def list_models():
     return [m.name for m in client.models.list()]
+```
+
+**`requirements.txt`**:
+```
+fastapi
+uvicorn
+google-generativeai
+pydantic
+```
+
+**`Procfile`** (no file extension):
+```
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+**`runtime.txt`** (optional but recommended):
+```
+python-3.11.0
