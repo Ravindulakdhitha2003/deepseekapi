@@ -1,29 +1,116 @@
-import os
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 
-def generate_gemini_content():
-    # 1. Setup - Fetch API Key from environment variables
-    # Recommendation: Run `export GEMINI_API_KEY='your_key_here'` in your terminal
-    api_key = os.getenv("GEMINI_API_KEY")
-    
-    if not api_key:
-        raise ValueError("Please set the GEMINI_API_KEY environment variable.")
+app = FastAPI(title="Gemini Travel Agent API")
 
-    # 2. Initialize the Client
-    client = genai.Client(api_key=api_key)
+# Allow all origins for testing
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # 3. Generate Content
-    # We're using 'gemini-2.0-flash' (standard for 2026) for speed and efficiency
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents="Explain the concept of 'Recursion' to a junior developer."
-    )
+class ChatRequest(BaseModel):
+    message: str
 
-    # 4. Output the result
-    print("-" * 30)
-    print("Gemini Response:")
-    print("-" * 30)
-    print(response.text)
+# Initialize Gemini client
+client = genai.Client()
 
-if __name__ == "__main__":
-    generate_gemini_content()
+# 🔒 STRICT JSON PROMPT (ONLY for trip planning)
+TRAVEL_AGENT_PROMPT = """
+You are a travel planning API.
+
+Return ONLY valid JSON.
+No explanations.
+No markdown.
+No extra text.
+
+Schema:
+{
+  "trip": [
+    {
+      "day": number,
+      "city": string,
+      "places": [
+        {
+          "name": string,
+          "type": string,
+          "imageQuery": string,
+          "description": string
+        }
+      ]
+    }
+  ]
+}
+"""
+
+# 💬 NORMAL CHAT PROMPT
+NORMAL_CHAT_PROMPT = """
+You are a helpful travel assistant.
+Answer clearly and concisely in plain text.
+"""
+
+# 🧠 Simple intent detection
+def is_trip_planning(message: str) -> bool:
+    keywords = [
+        "plan a trip",
+        "trip plan",
+        "travel plan",
+        "itinerary",
+        "travel itinerary",
+        "day trip",
+        "days trip",
+        "visit places",
+        "tour plan"
+    ]
+    msg = message.lower()
+    return any(k in msg for k in keywords)
+
+@app.get("/")
+def health():
+    return {"status": "ok"}
+
+@app.post("/chat")
+def chat(data: ChatRequest):
+    try:
+        user_message = data.message
+
+        # 🔀 Decide prompt based on intent
+        if is_trip_planning(user_message):
+            full_prompt = f"""
+{TRAVEL_AGENT_PROMPT}
+
+User request:
+{user_message}
+"""
+        else:
+            full_prompt = f"""
+{NORMAL_CHAT_PROMPT}
+
+User request:
+{user_message}
+"""
+
+        response = client.models.generate_content(
+            model="models/gemini-3-flash-preview",
+            contents=full_prompt
+        )
+
+        return {
+            "reply": response.text,
+            "mode": "json" if is_trip_planning(user_message) else "text"
+        }
+
+    except Exception as e:
+        return {
+            "reply": "Sorry, something went wrong.",
+            "error": str(e)
+        }
+
+@app.get("/models")
+def list_models():
+    models = client.models.list()
+    return [m.name for m in models]
