@@ -1,0 +1,13 @@
+[phases.setup]
+nixPkgs = ["python311"]
+```
+
+This tells Railway's build system (Nixpacks) to use Python 3.11 directly from Nix packages, which always has precompiled binaries.
+
+---
+
+**Option 3 — Use a `.python-version` file**
+
+Delete `runtime.txt` and create `.python-version`:
+```
+3.11
