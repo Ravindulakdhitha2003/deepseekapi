@@ -4,10 +4,10 @@ from google import genai
 
 app = Flask(__name__)
 
-# Configure API key
+# Set API key from Railway variables
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Gemini 2.5 model
+# Gemini 2.5 chat model
 model = genai.ChatModel.from_name("chat-bison-002")
 
 @app.route("/api", methods=["POST"])
