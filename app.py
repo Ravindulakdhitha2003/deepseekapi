@@ -1,23 +1,27 @@
 from flask import Flask, request, jsonify
 import os
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__)
 
-# Configure Gemini API
+# Configure API key
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel("gemini-pro")
+# Use a Gemini 2.5 compatible model (chat-bison-002 is the 2.5 series)
+model = genai.ChatModel.from_name("chat-bison-002")
 
 @app.route("/api", methods=["POST"])
 def api():
-    user_input = request.json.get("message")
+    data = request.get_json()
+    if not data or "message" not in data:
+        return jsonify({"error": "No message provided"}), 400
 
-    response = model.generate_content(user_input)
+    user_input = data["message"]
 
-    return jsonify({
-        "reply": response.text
-    })
+    response = model.predict(messages=[{"author": "user", "content": user_input}])
+
+    return jsonify({"reply": response.content})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
