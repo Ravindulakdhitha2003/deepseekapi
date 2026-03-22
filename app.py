@@ -1,27 +1,22 @@
 from flask import Flask, request, jsonify
 import os
-from openai import OpenAI
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com"
-)
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+model = genai.GenerativeModel("gemini-pro")
 
 @app.route("/api", methods=["POST"])
 def api():
     user_input = request.json.get("message")
 
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[
-            {"role": "user", "content": user_input}
-        ]
-    )
+    response = model.generate_content(user_input)
 
     return jsonify({
-        "reply": response.choices[0].message.content
+        "reply": response.text
     })
 
 if __name__ == "__main__":
