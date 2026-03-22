@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from google import genai
+import google.generativeai as genai
 
 app = FastAPI(title="Gemini Travel Agent API")
 
