@@ -21,6 +21,10 @@ RECIPE_PROMPT = """You are a professional chef API and food expert.
 
 Return ONLY valid JSON when the user asks for a recipe.
 Do NOT include markdown, explanations, or extra text.
+Return ONLY valid JSON.
+No explanations.
+No markdown.
+No extra text.
 
 Schema:
 {
