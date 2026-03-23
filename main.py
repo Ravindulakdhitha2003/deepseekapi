@@ -4,20 +4,70 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 
-app = FastAPI()
+app = FastAPI(title="Gemini Chef API")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
-# Ensure your GEMINI_API_KEY is set in your environment variables
+# Ensure your GEMINI_API_KEY is set in environment variables
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-TRIP_PROMPT = """You are a travel planning API. Return ONLY valid JSON, no markdown, no extra text.
-Schema: {"trip":[{"day":number,"city":string,"places":[{"name":string,"type":string,"imageQuery":string,"description":string}]}]}"""
+# ✅ CHANGED: Recipe JSON Prompt
+RECIPE_PROMPT = """You are a professional chef API and food expert.
 
-CHAT_PROMPT = "You are a helpful travel assistant. Answer clearly in plain text."
+Return ONLY valid JSON when the user asks for a recipe.
+Do NOT include markdown, explanations, or extra text.
 
-def is_trip(msg: str) -> bool:
-    keywords = ["plan a trip","trip plan","itinerary","day trip","days trip","tour plan","visit places"]
+Schema:
+{
+  "recipes": [
+    {
+      "r_name": string,
+      "category": string,
+      "description": string,
+      "cooking_step": string,
+      "r_picture": string,
+      "ingredients": [
+        {
+          "ingredient_name": string,
+          "quantity": number,
+          "unit": string,
+          "calories": number,
+          "carbohydrates": number,
+          "protein": number,
+          "fat": number,
+          "clarity": string
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- r_picture must be a valid image URL of the dish.
+- cooking_step must be step-by-step instructions in one string.
+- Include at least 3 ingredients.
+- Nutritional values must be realistic.
+- STRICTLY return JSON only for recipe requests.
+"""
+
+# ✅ CHANGED: Normal Chat Prompt
+CHAT_PROMPT = """You are a helpful chef and food expert.
+Answer clearly in plain text.
+Give cooking tips, ingredient advice, and food knowledge.
+Do NOT return JSON unless the user asks for a recipe.
+"""
+
+# ✅ CHANGED: Detection Function
+def is_recipe(msg: str) -> bool:
+    keywords = [
+        "recipe", "cook", "make", "how to cook",
+        "how to make", "prepare", "dish"
+    ]
     return any(k in msg.lower() for k in keywords)
 
 class ChatRequest(BaseModel):
@@ -30,16 +80,22 @@ def health():
 @app.post("/chat")
 def chat(req: ChatRequest):
     try:
-        trip_mode = is_trip(req.message)
-        prompt = f"{TRIP_PROMPT if trip_mode else CHAT_PROMPT}\n\nUser: {req.message}"
-        
-        # CHANGED: Switched to gemini-2.5-flash which is the current stable free-tier model
+        recipe_mode = is_recipe(req.message)
+
+        prompt = f"{RECIPE_PROMPT if recipe_mode else CHAT_PROMPT}\n\nUser: {req.message}"
+
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-2.5-flash",
             contents=prompt
         )
-        
-        return {"reply": response.text, "mode": "json" if trip_mode else "text"}
+
+        return {
+            "reply": response.text,
+            "mode": "json" if recipe_mode else "text"
+        }
+
     except Exception as e:
-        # This will now show the specific error if 2.5 is also restricted in your region
-        return {"reply": "Something went wrong.", "error": str(e)}
+        return {
+            "reply": "Something went wrong.",
+            "error": str(e)
+        }
