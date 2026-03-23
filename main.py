@@ -65,8 +65,8 @@ Do NOT return JSON unless the user asks for a recipe.
 # ✅ CHANGED: Detection Function
 def is_recipe(msg: str) -> bool:
     keywords = [
-        "recipe", "cook", "make", "how to cook",
-        "how to make", "prepare", "dish"
+        "how to cook",
+        "how to make", "how to prepare","give me recipe"
     ]
     return any(k in msg.lower() for k in keywords)
 
