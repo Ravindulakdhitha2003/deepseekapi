@@ -8,6 +8,7 @@ app = FastAPI()
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Ensure your GEMINI_API_KEY is set in your environment variables
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 TRIP_PROMPT = """You are a travel planning API. Return ONLY valid JSON, no markdown, no extra text.
@@ -32,12 +33,13 @@ def chat(req: ChatRequest):
         trip_mode = is_trip(req.message)
         prompt = f"{TRIP_PROMPT if trip_mode else CHAT_PROMPT}\n\nUser: {req.message}"
         
-        # Change: model set to "gemini-1.5-flash" for Free Tier stability
+        # CHANGED: Switched to gemini-2.5-flash which is the current stable free-tier model
         response = client.models.generate_content(
-            model="gemini-1.5-flash", 
+            model="gemini-2.5-flash", 
             contents=prompt
         )
         
         return {"reply": response.text, "mode": "json" if trip_mode else "text"}
     except Exception as e:
+        # This will now show the specific error if 2.5 is also restricted in your region
         return {"reply": "Something went wrong.", "error": str(e)}
