@@ -31,7 +31,13 @@ def chat(req: ChatRequest):
     try:
         trip_mode = is_trip(req.message)
         prompt = f"{TRIP_PROMPT if trip_mode else CHAT_PROMPT}\n\nUser: {req.message}"
-        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+        
+        # Change: model set to "gemini-1.5-flash" for Free Tier stability
+        response = client.models.generate_content(
+            model="gemini-1.5-flash", 
+            contents=prompt
+        )
+        
         return {"reply": response.text, "mode": "json" if trip_mode else "text"}
     except Exception as e:
         return {"reply": "Something went wrong.", "error": str(e)}
